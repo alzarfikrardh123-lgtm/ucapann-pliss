@@ -1,0 +1,201 @@
+<!DOCTYPE html>
+<html lang="id">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<title>Selamat Ulang Tahun!</title>
+<style>
+:root{--bg1:#ffe3ec;--bg2:#fff4d6;--card:#fff;--text:#3a2335;--muted:#7a5d72;--accent:#e8457c;--accent2:#ffb347;--cake:#f7a8c4;--cake2:#fff1c9}
+@media (prefers-color-scheme:dark){:root{--bg1:#2a1530;--bg2:#1c1a33;--card:#2f2340;--text:#fbeaf3;--muted:#c9aebf;--accent:#ff6b9d;--accent2:#ffc15e;--cake:#c9668e;--cake2:#e8d6a0}}
+*{box-sizing:border-box}
+body{margin:0;min-height:100vh;font-family:system-ui,-apple-system,"Segoe UI",Roboto,sans-serif;color:var(--text);background:linear-gradient(135deg,var(--bg1),var(--bg2));display:flex;align-items:center;justify-content:center;padding:20px;overflow-x:hidden}
+canvas{position:fixed;inset:0;pointer-events:none;z-index:5}
+.card{position:relative;z-index:2;width:100%;max-width:440px;background:var(--card);border-radius:28px;padding:28px 22px 22px;text-align:center;box-shadow:0 20px 50px rgba(232,69,124,.22)}
+h1{font-family:Georgia,"Times New Roman",serif;margin:.2em 0;color:var(--accent);line-height:1.25;font-size:1.9rem}
+p{color:var(--muted);line-height:1.65;margin:.6em 0}
+button{padding:12px 22px;border:0;border-radius:999px;background:linear-gradient(135deg,var(--accent),var(--accent2));color:#fff;font-size:1rem;font-weight:600;cursor:pointer;box-shadow:0 8px 20px rgba(232,69,124,.3);transition:transform .15s}
+button:hover{transform:translateY(-2px)}button:active{transform:scale(.97)}
+button.ghost{background:transparent;color:var(--accent);box-shadow:none;border:2px solid var(--accent)}
+button:disabled{opacity:.35;cursor:default;transform:none}
+#show{display:none}
+.stage{animation:in .5s ease}
+@keyframes in{from{opacity:0;transform:translateY(12px)}to{opacity:1;transform:none}}
+.photo{width:100%;aspect-ratio:16/9;object-fit:cover;border-radius:20px;border:5px solid var(--accent);box-shadow:0 10px 25px rgba(232,69,124,.3);display:block;margin:0 auto 14px}
+.teks{white-space:pre-line;font-size:1.02rem}
+.nav{display:flex;align-items:center;justify-content:space-between;gap:10px;margin-top:20px}
+.dots{display:flex;gap:7px;justify-content:center;flex-wrap:wrap}
+.dot{width:9px;height:9px;border-radius:50%;background:var(--bg1);border:1px solid var(--accent)}
+.dot.on{background:var(--accent);transform:scale(1.25)}
+.cake{width:180px;margin:6px auto;cursor:pointer;display:block}
+.flame{transform-origin:50% 100%;animation:fl .5s ease-in-out infinite alternate}
+@keyframes fl{from{transform:scale(1) rotate(-3deg)}to{transform:scale(1.12) rotate(3deg)}}
+.off .flame{display:none}
+.sender{font-weight:600;color:var(--accent)}
+.hint{font-size:.85rem}
+#mute{position:fixed;top:14px;right:14px;z-index:6;width:44px;height:44px;padding:0;font-size:1.2rem;display:none}
+#note{font-size:.8rem;color:#d33;margin-top:10px;display:none}
+</style>
+</head>
+<body>
+<canvas id="c"></canvas>
+<button id="mute" aria-label="Musik">🔊</button>
+<audio id="bgm" loop preload="auto"></audio>
+
+<main class="card">
+  <section id="intro">
+    <div style="font-size:3.5rem">🎁</div>
+    <h1>KEPOO YAA</h1>
+    <p>buka aja sayaang</p>
+    <button id="open">Buka Kejutan 🎉</button>
+  </section>
+
+  <section id="show">
+    <div class="stage" id="stage"></div>
+    <div class="nav">
+      <button class="ghost" id="back">← Kembali</button>
+      <button id="next">Lanjut →</button>
+    </div>
+    <div class="dots" id="dots" style="margin-top:16px"></div>
+    <div id="note"></div>
+  </section>
+</main>
+
+<script>
+/* ================== PENGATURAN: ubah bagian ini saja ================== */
+const CONFIG = {
+  nama: "sayangku",
+  dari: "cowokmuu alayaar",
+  lagu: "lagu.mp3"          // nama file lagu, harus sama persis
+};
+
+/* Tiap slide = satu halaman. Tambah / hapus / ubah sesuka hati.
+   Tulis {nama} untuk memunculkan nama yang berulang tahun.
+   Pakai \n untuk baris baru. Slide dengan kue:true menampilkan kue tiup lilin. */
+const SLIDES = [
+  { foto: "foto1.jpg", judul: "Selamat Ulang Tahun yang ke-19, {nama} 🎉",
+    teks: "Hari ini hari spesialmu.\nlanjut yaa" },
+  { foto: "foto2.jpg", judul: "ciee ultah nihh 💖",
+    teks: ".\ndi hari ulang tahunmu ini semoga kamu selalu bahagia yaa" },
+  { foto: "foto3.jpg", judul: "harapanku buat kamu ✨",
+    teks: "semoga panjang umur, sehat selalu,\ndan semua impianmu satu per satu jadi nyata." },
+  { foto: "foto4.jpg", judul: "tiup lilin nya sayang 🎂", kue: true,
+    teks: "tapi dipencet yaa." }
+];
+/* ====================================================================== */
+
+const $ = id => document.getElementById(id);
+const bgm = $("bgm");
+const fill = s => s.replaceAll("{nama}", CONFIG.nama);
+let idx = 0;
+
+document.title = "Selamat Ulang Tahun, " + CONFIG.nama + "!";
+
+/* Musik */
+if (CONFIG.lagu) {
+  bgm.src = CONFIG.lagu;
+  bgm.onerror = () => {
+    $("note").style.display = "block";
+    $("note").textContent = "⚠️ Lagu \"" + CONFIG.lagu + "\" tidak ditemukan. Cek nama file-nya.";
+  };
+}
+
+/* Confetti */
+const cv = $("c"), cx = cv.getContext("2d");
+let parts = [], raf = null;
+function size(){ cv.width = innerWidth; cv.height = innerHeight; }
+size(); addEventListener("resize", size);
+function burst(n = 140){
+  const cols = ["#e8457c","#ffb347","#6ec6ff","#a7e08c","#c58cff","#ffffff"];
+  for (let i = 0; i < n; i++) parts.push({x:innerWidth/2,y:innerHeight/3,vx:(Math.random()-.5)*14,vy:Math.random()*-12-2,s:Math.random()*7+4,c:cols[i%cols.length],r:Math.random()*6,vr:(Math.random()-.5)*.4});
+  if (!raf) loop();
+}
+function loop(){
+  cx.clearRect(0,0,cv.width,cv.height);
+  parts.forEach(p => {
+    p.vy += .28; p.x += p.vx; p.y += p.vy; p.vx *= .99; p.r += p.vr;
+    cx.save(); cx.translate(p.x,p.y); cx.rotate(p.r); cx.fillStyle = p.c; cx.fillRect(-p.s/2,-p.s/4,p.s,p.s/2); cx.restore();
+  });
+  parts = parts.filter(p => p.y < innerHeight + 20);
+  raf = parts.length ? requestAnimationFrame(loop) : null;
+  if (!raf) cx.clearRect(0,0,cv.width,cv.height);
+}
+
+const CAKE = `
+<svg class="cake" id="cake" viewBox="0 0 200 190" aria-label="Kue ulang tahun">
+  <rect x="62" y="62" width="10" height="34" rx="3" fill="#6ec6ff"/><path class="flame" d="M67 40c7 9 7 16 0 20-7-4-7-11 0-20z" fill="#ffb347"/>
+  <rect x="95" y="52" width="10" height="44" rx="3" fill="#ff8fb3"/><path class="flame" d="M100 30c7 9 7 16 0 20-7-4-7-11 0-20z" fill="#ffb347"/>
+  <rect x="128" y="62" width="10" height="34" rx="3" fill="#a7e08c"/><path class="flame" d="M133 40c7 9 7 16 0 20-7-4-7-11 0-20z" fill="#ffb347"/>
+  <rect x="30" y="94" width="140" height="42" rx="10" fill="var(--cake)"/>
+  <path d="M30 108q12 12 24 0t24 0 24 0 24 0 24 0 20 0v-6a8 8 0 0 0-8-8H38a8 8 0 0 0-8 8z" fill="var(--cake2)"/>
+  <rect x="18" y="134" width="164" height="44" rx="12" fill="var(--accent)"/>
+  <path d="M18 150q13 12 27 0t27 0 27 0 27 0 27 0 20 0v-4a12 12 0 0 0-12-12H30a12 12 0 0 0-12 12z" fill="var(--cake2)"/>
+</svg>
+<p class="hint" id="hint">Ketuk kue untuk meniup lilin 🕯️</p>
+<p>Dari <span class="sender">${CONFIG.dari}</span></p>`;
+
+function render(){
+  const s = SLIDES[idx];
+  const st = $("stage");
+  st.innerHTML = "";
+  st.style.animation = "none"; void st.offsetWidth; st.style.animation = "";
+
+  if (s.foto) {
+    const img = new Image();
+    img.className = "photo"; img.alt = "Foto";
+    img.onerror = () => img.remove();
+    img.src = s.foto;
+    st.appendChild(img);
+  }
+  const h = document.createElement("h1"); h.textContent = fill(s.judul || ""); st.appendChild(h);
+  const p = document.createElement("p"); p.className = "teks"; p.textContent = fill(s.teks || ""); st.appendChild(p);
+
+  if (s.kue) {
+    const w = document.createElement("div"); w.innerHTML = CAKE; st.appendChild(w);
+    $("cake").onclick = () => {
+      const c = $("cake");
+      if (!c.classList.contains("off")) { c.classList.add("off"); $("hint").textContent = "Yeay! Semoga permintaanmu terkabul ✨"; burst(200); }
+      else { c.classList.remove("off"); $("hint").textContent = "Ketuk kue untuk meniup lilin 🕯️"; }
+    };
+  }
+
+  $("back").disabled = idx === 0;
+  $("next").textContent = idx === SLIDES.length - 1 ? "Ulangi ↺" : "Lanjut →";
+  $("dots").innerHTML = SLIDES.map((_, i) => `<span class="dot${i === idx ? " on" : ""}"></span>`).join("");
+}
+
+function go(d){
+  if (d > 0 && idx === SLIDES.length - 1) { idx = 0; }
+  else { idx = Math.max(0, Math.min(SLIDES.length - 1, idx + d)); }
+  render();
+}
+
+$("open").onclick = () => {
+  $("intro").style.display = "none";
+  $("show").style.display = "block";
+  render(); burst();
+  if (CONFIG.lagu) bgm.play().then(() => $("mute").style.display = "block").catch(() => {});
+};
+$("next").onclick = () => go(1);
+$("back").onclick = () => go(-1);
+$("mute").onclick = () => {
+  if (bgm.paused) { bgm.play(); $("mute").textContent = "🔊"; }
+  else { bgm.pause(); $("mute").textContent = "🔇"; }
+};
+
+/* Panah keyboard dan geser layar di HP */
+addEventListener("keydown", e => {
+  if ($("show").style.display !== "block") return;
+  if (e.key === "ArrowRight") go(1);
+  if (e.key === "ArrowLeft") go(-1);
+});
+let sx = null;
+addEventListener("touchstart", e => sx = e.touches[0].clientX, {passive:true});
+addEventListener("touchend", e => {
+  if (sx === null || $("show").style.display !== "block") return;
+  const dx = e.changedTouches[0].clientX - sx;
+  if (Math.abs(dx) > 60) go(dx < 0 ? 1 : -1);
+  sx = null;
+});
+</script>
+</body>
+</html>
